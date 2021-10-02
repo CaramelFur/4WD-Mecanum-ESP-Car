@@ -1,10 +1,10 @@
 {
 	"folders": [
 		{
-			"path": "."
+			"path": "Motor-Driver"
 		},
 		{
-			"path": "Motor-Driver"
+			"path": "Main-Controller"
 		}
 	],
 	"settings": {}
