@@ -16,7 +16,13 @@
 
 #define PULSES_PER_ROTATION (10 * 90)
 
+#define RENZO 1
+
+#ifdef SEBAS
+
 #define NO_HALF_TANK_TURN
+#define MAX_AXIS 128
+#define AXIS_ZERO 5
 
 uint8_t Motors[MOTORCOUNT][2][2] = {
     {
@@ -40,6 +46,36 @@ uint8_t Motors[MOTORCOUNT][2][2] = {
         {13, 33}, // Sensor pins
     },
 };
+#endif
+
+#ifdef RENZO
+
+#define MAX_AXIS 100
+#define AXIS_ZERO 15
+
+uint8_t Motors[MOTORCOUNT][2][2] = {
+    {
+        // Left Front
+        {2, 15},  // Motor pins
+        {36, 26}, // Sensor pins
+    },
+    {
+        // Right Front
+        {12, 32}, // Motor pins
+        {23, 5},  // Sensor pins
+    },
+    {
+        // Left Back
+        {4, 16},  // Motor pins
+        {18, 19}, // Sensor pins
+    },
+    {
+        // Right Back
+        {25, 27}, // Motor pins
+        {13, 33}, // Sensor pins
+    },
+};
+#endif
 
 uint8_t mymacaddr[] = {0x7c, 0x9e, 0xbd, 0xe2, 0xdf, 0x32};
 int battery = 0;
@@ -54,18 +90,20 @@ void controller_event_cb(ps3_t data, ps3_event_t event)
 {
     if ((abs(event.analog_changed.stick.lx) + abs(event.analog_changed.stick.ly) > 0) || (abs(event.analog_changed.stick.rx) + abs(event.analog_changed.stick.ry) > 0))
     {
+        //printf("%d %d - %d %d\n", data.analog.stick.lx, data.analog.stick.ly, data.analog.stick.rx, data.analog.stick.ry);
+
         double LY = 0;
         double LX = 0;
-        if (abs(data.analog.stick.ly) > 5)
-            LY = (-(double)data.analog.stick.ly) / 128;
+        if (abs(data.analog.stick.ly) > AXIS_ZERO)
+            LY = (-(double)data.analog.stick.ly) / MAX_AXIS;
         else
-            LY = (-(double)data.analog.stick.ry) / 128;
-        if (abs(data.analog.stick.lx) > 5)
-            LX = ((double)data.analog.stick.lx) / 128;
+            LY = (-(double)data.analog.stick.ry) / MAX_AXIS;
+        if (abs(data.analog.stick.lx) > AXIS_ZERO)
+            LX = ((double)data.analog.stick.lx) / MAX_AXIS;
 
         double RX = 0;
-        if (abs(data.analog.stick.rx) > 5)
-            RX = ((double)data.analog.stick.rx) / 128;
+        if (abs(data.analog.stick.rx) > AXIS_ZERO)
+            RX = ((double)data.analog.stick.rx) / MAX_AXIS;
 
         double leftF = 0;
         double rightF = 0;
