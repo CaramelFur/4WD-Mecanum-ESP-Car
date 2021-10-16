@@ -9,14 +9,25 @@
 #include "soc/mcpwm_periph.h"
 #include "nvs_flash.h"
 
+// Static
+
+#define PULSES_PER_ROTATION (10 * 90)
+
+#define WATCHDOG_TIMEOUT 5000
+
+// Pindefs
+
 #define MOTORCOUNT 4
 
 #define MOTORPINS 0
 #define SENSEPINS 1
 
-#define PULSES_PER_ROTATION (10 * 90)
+#define SDL_PIN 22
+#define SDA_PIN 21
 
-#define RENZO 1
+// Per device config
+
+#define SEBAS 1
 
 #ifdef SEBAS
 
@@ -80,14 +91,17 @@ uint8_t Motors[MOTORCOUNT][2][2] = {
 uint8_t mymacaddr[] = {0x7c, 0x9e, 0xbd, 0xe2, 0xdf, 0x32};
 int battery = 0;
 
-void doMotor(int motor, float speed)
-{
-    mcpwm_set_duty((mcpwm_unit_t)(motor / 2), (mcpwm_timer_t)(motor % 2), (mcpwm_generator_t)0, speed < 0 ? abs(speed) : 0);
-    mcpwm_set_duty((mcpwm_unit_t)(motor / 2), (mcpwm_timer_t)(motor % 2), (mcpwm_generator_t)1, speed > 0 ? abs(speed) : 0);
-}
+int64_t lastMessageMS = 0;
+
+int msToTicks(int ms);
+void doAllMotor(float speed);
+void doMotor(int motor, float speed);
+int64_t getTimeSinceBoot();
 
 void controller_event_cb(ps3_t data, ps3_event_t event)
 {
+    lastMessageMS = getTimeSinceBoot();
+
     if ((abs(event.analog_changed.stick.lx) + abs(event.analog_changed.stick.ly) > 0) || (abs(event.analog_changed.stick.rx) + abs(event.analog_changed.stick.ry) > 0))
     {
         //printf("%d %d - %d %d\n", data.analog.stick.lx, data.analog.stick.ly, data.analog.stick.rx, data.analog.stick.ry);
@@ -187,7 +201,7 @@ void app_main()
         mcpwm_gpio_init((mcpwm_unit_t)(i / 2), (mcpwm_io_signals_t)(((i % 2) * 2) + 1), Motors[i][MOTORPINS][1]);
 
         mcpwm_config_t c = {
-            .frequency = 1000,
+            .frequency = 50000,
             .cmpr_a = 0,
             .cmpr_b = 0,
             .duty_mode = MCPWM_DUTY_MODE_0,
@@ -220,8 +234,44 @@ void app_main()
 
     fflush(stdout);
 
+    lastMessageMS = getTimeSinceBoot();
+
     while (true)
     {
-        vTaskDelay(500 / portTICK_RATE_MS);
+        int64_t currentTime = getTimeSinceBoot();
+        if (currentTime - lastMessageMS > msToTicks(WATCHDOG_TIMEOUT))
+        {
+            printf("Bye bye\n");
+            doAllMotor(100);
+            vTaskDelay(msToTicks(200));
+            doAllMotor(0);
+
+            esp_restart();
+        }
+        vTaskDelay(msToTicks(500));
     }
+}
+
+void doAllMotor(float speed)
+{
+    doMotor(0, speed);
+    doMotor(1, speed);
+    doMotor(2, speed);
+    doMotor(3, speed);
+}
+
+void doMotor(int motor, float speed)
+{
+    mcpwm_set_duty((mcpwm_unit_t)(motor / 2), (mcpwm_timer_t)(motor % 2), (mcpwm_generator_t)0, speed < 0 ? abs(speed) : 0);
+    mcpwm_set_duty((mcpwm_unit_t)(motor / 2), (mcpwm_timer_t)(motor % 2), (mcpwm_generator_t)1, speed > 0 ? abs(speed) : 0);
+}
+
+int64_t getTimeSinceBoot()
+{
+    return esp_timer_get_time() / 1000;
+}
+
+int msToTicks(int ms)
+{
+    return ms / portTICK_RATE_MS;
 }
